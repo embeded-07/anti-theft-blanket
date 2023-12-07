@@ -28,7 +28,7 @@ uint8_t slopeFlag = 0;
 uint8_t lightFlag = 0;
 
 uint8_t startSignal = 0;
-uint8_t brightValue = 0;
+uint16_t brightValue = 0;
 
 void RCC_Configure(void)
 {
@@ -130,7 +130,7 @@ void Light_NVIC_Configure()
 // 조도 센서 값 핸들링
 void ADC1_2_IRQHandler()
 {
-  uint8_t threshold = 3900;
+  uint16_t threshold = 3900;
 
   if (ADC_GetITStatus(ADC1, ADC_IT_EOC) != RESET)
   {
@@ -196,9 +196,6 @@ int main(void)
   clickStartButton();
   while (1)
   {
-    LCD_ShowNum(40, 0, initStatus, 4, BLACK, WHITE);
-    LCD_ShowNum(40, 20, getSlopeSensorValue(), 4, BLACK, WHITE);
-    LCD_ShowNum(40, 40, slopeFlag, 4, BLACK, WHITE);
 
     // 조도 센서 밝기 감지
     if (lightFlag == 1)

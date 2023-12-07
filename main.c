@@ -216,6 +216,8 @@ int main(void)
       LCD_Clear(WHITE);
       LCD_ShowNum(40, 100, brightValue, 8, BLACK, WHITE);
       GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+      Delay();
+      GPIO_ResetBits(GPIOD, GPIO_Pin_3);
     }
     // 기울기 센서 변화 감지
     else if (slopeFlag == 1)

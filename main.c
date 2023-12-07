@@ -7,7 +7,6 @@
 #include "stm32f10x_exti.h"
 #include "core_cm3.h"
 #include "misc.h"
-#include "lcd.h"
 #include "touch.h"
 
 /* function prototype */
@@ -141,12 +140,12 @@ void Light_NVIC_Configure()
 // 조도 센서 값 핸들링
 void ADC1_2_IRQHandler()
 {
-  uint16_t threshold = 3900;
+  uint16_t threshold = 3950;
 
   if (ADC_GetITStatus(ADC1, ADC_IT_EOC) != RESET)
   {
     brightValue = ADC_GetConversionValue(ADC1);
-    if (startSignal && (brightValue < threshold))
+    if (startSignal && slopeFlag && (brightValue < threshold))
     {
       lightFlag = 1;
     }
@@ -200,11 +199,6 @@ int main(void)
   Light_NVIC_Configure();
   Output_GPIO_Configure();
 
-  LCD_Init();
-  Touch_Configuration();
-  Touch_Adjust();
-  LCD_Clear(WHITE);
-
   // 시작버튼이라 가정
   clickStartButton();
   while (1)
@@ -213,8 +207,6 @@ int main(void)
     // 조도 센서 밝기 감지
     if (lightFlag == 1)
     {
-      LCD_Clear(WHITE);
-      LCD_ShowNum(40, 100, brightValue, 8, BLACK, WHITE);
       GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
       Delay();
       GPIO_ResetBits(GPIOD, GPIO_Pin_3);
@@ -223,14 +215,11 @@ int main(void)
     else if (slopeFlag == 1)
     {
       // 조도 센서 값 읽기
-      LCD_Clear(WHITE);
       ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-      LCD_ShowString(40, 100, "LIGHT SENSING...", BLACK, WHITE);
     }
     // 평상시
     else
     {
-      LCD_ShowString(40, 100, "WAITING...", BLACK, WHITE);
     }
   }
   return 0;

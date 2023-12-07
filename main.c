@@ -12,27 +12,51 @@
 
 /* function prototype */
 void RCC_Configure(void);
-void GPIO_Configure(void);
+void Slope_GPIO_Configure(void);
+void Light_GPIO_Configure(void);
 void EXTI_Configure(void);
-void NVIC_Configure(void);
+void ADC_Configure(void);
+void ADC1_2_IRQHandler(void);
+void Slope_NVIC_Configure(void);
+void Light_NVIC_Configure(void);
 void EXTI15_10_IRQHandler(void);
 void Delay(void);
 
 //---------------------------------------------------------------------------------------------------
-int flag = 1;
+uint8_t initStatus = 0;
+uint8_t slopeFlag = 0;
+uint8_t lightFlag = 0;
+
+uint8_t startSignal = 0;
+uint8_t brightValue = 0;
 
 void RCC_Configure(void)
 {
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+  // PC10 - 기울기 센서
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+  // 조도 센서
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 }
 
-void GPIO_Configure(void)
+// 기울기 센서 초기화 - PC10
+void Slope_GPIO_Configure(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
 
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+  GPIO_Init(GPIOC, &GPIO_InitStructure);
+}
+
+// 조도 센서 초기화 - PC2
+void Light_GPIO_Configure()
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
@@ -49,13 +73,37 @@ void EXTI_Configure(void)
   EXTI_Init(&EXTI_InitStructure);
 }
 
-void NVIC_Configure(void)
+// 조도 센서
+void ADC_Configure(void)
+{
+  ADC_InitTypeDef ADC_12;
+  ADC_12.ADC_ContinuousConvMode = ENABLE;
+  ADC_12.ADC_DataAlign = ADC_DataAlign_Right;
+  ADC_12.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;
+  ADC_12.ADC_Mode = ADC_Mode_Independent;
+  ADC_12.ADC_NbrOfChannel = 1;
+  ADC_12.ADC_ScanConvMode = DISABLE;
+
+  ADC_Init(ADC1, &ADC_12);
+  ADC_RegularChannelConfig(ADC1, ADC_Channel_12, 1, ADC_SampleTime_239Cycles5);
+  ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
+  ADC_Cmd(ADC1, ENABLE);
+  ADC_ResetCalibration(ADC1);
+  while (ADC_GetResetCalibrationStatus(ADC1))
+    ;
+  ADC_StartCalibration(ADC1);
+  while (ADC_GetCalibrationStatus(ADC1))
+    ;
+  ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+}
+
+// 기울기 센서
+void Slope_NVIC_Configure(void)
 {
   NVIC_InitTypeDef NVIC_InitStructure;
 
   NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 
-  // 기울기 센서
   NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQn;
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
@@ -63,17 +111,46 @@ void NVIC_Configure(void)
   NVIC_Init(&NVIC_InitStructure);
 }
 
+// 조도 센서
+void Light_NVIC_Configure()
+{
+  NVIC_InitTypeDef NVIC_InitStructure;
+
+  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+
+  NVIC_EnableIRQ(ADC1_2_IRQn);
+  NVIC_InitStructure.NVIC_IRQChannel = ADC1_2_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+
+  NVIC_Init(&NVIC_InitStructure);
+}
+
+// 조도 센서 값 핸들링
+void ADC1_2_IRQHandler()
+{
+  uint8_t threshold = 3900;
+
+  if (ADC_GetITStatus(ADC1, ADC_IT_EOC) != RESET)
+  {
+    brightValue = ADC_GetConversionValue(ADC1);
+    if (startSignal && (brightValue < threshold))
+    {
+      lightFlag = 1;
+    }
+    ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
+  }
+}
+
+// 기울기 센서 값 핸들링
 void EXTI15_10_IRQHandler(void)
 {
   if (EXTI_GetITStatus(EXTI_Line10) != RESET)
   {
-    if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_10) == Bit_RESET)
+    if (startSignal && (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_10) != initStatus))
     {
-      flag = 0;
-    }
-    else
-    {
-      flag = 1;
+      slopeFlag = 1;
     }
     EXTI_ClearITPendingBit(EXTI_Line10);
   }
@@ -92,28 +169,56 @@ int getSlopeSensorValue()
   return GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_10);
 }
 
+void clickStartButton()
+{
+  startSignal = 1;
+  initStatus = getSlopeSensorValue();
+  return;
+}
+
 int main(void)
 {
-
   SystemInit();
-
   RCC_Configure();
-
-  GPIO_Configure();
-
+  Slope_GPIO_Configure();
+  Light_GPIO_Configure();
+  ADC_Configure();
   EXTI_Configure();
-
-  NVIC_Configure();
+  Slope_NVIC_Configure();
+  Light_NVIC_Configure();
 
   LCD_Init();
   Touch_Configuration();
   Touch_Adjust();
   LCD_Clear(WHITE);
 
+  // 시작버튼이라 가정
+  clickStartButton();
   while (1)
   {
-    int slopeValue = getSlopeSensorValue();
-    LCD_ShowNum(60, 160, slopeValue, 10, WHITE, GRAY);
+    LCD_ShowNum(40, 0, initStatus, 4, BLACK, WHITE);
+    LCD_ShowNum(40, 20, getSlopeSensorValue(), 4, BLACK, WHITE);
+    LCD_ShowNum(40, 40, slopeFlag, 4, BLACK, WHITE);
+
+    // 조도 센서 밝기 감지
+    if (lightFlag == 1)
+    {
+      LCD_Clear(WHITE);
+      LCD_ShowNum(40, 100, brightValue, 8, BLACK, WHITE);
+    }
+    // 기울기 센서 변화 감지
+    else if (slopeFlag == 1)
+    {
+      // 조도 센서 값 읽기
+      LCD_Clear(WHITE);
+      ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+      LCD_ShowString(40, 100, "LIGHT SENSING...", BLACK, WHITE);
+    }
+    // 평상시
+    else
+    {
+      LCD_ShowString(40, 100, "WAITING...", BLACK, WHITE);
+    }
   }
   return 0;
 }

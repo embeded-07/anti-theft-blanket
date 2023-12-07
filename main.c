@@ -37,6 +37,8 @@ void RCC_Configure(void)
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
   // 조도 센서
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+  // LED, 부저
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
 }
 
 // 기울기 센서 초기화 - PC10
@@ -58,6 +60,15 @@ void Light_GPIO_Configure()
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_Init(GPIOC, &GPIO_InitStructure);
+}
+
+void Output_GPIO_Configure()
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_Init(GPIOD, &GPIO_InitStructure);
 }
 
 void EXTI_Configure(void)
@@ -173,6 +184,7 @@ void clickStartButton()
 {
   startSignal = 1;
   initStatus = getSlopeSensorValue();
+  GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
   return;
 }
 
@@ -186,6 +198,7 @@ int main(void)
   EXTI_Configure();
   Slope_NVIC_Configure();
   Light_NVIC_Configure();
+  Output_GPIO_Configure();
 
   LCD_Init();
   Touch_Configuration();
@@ -202,6 +215,7 @@ int main(void)
     {
       LCD_Clear(WHITE);
       LCD_ShowNum(40, 100, brightValue, 8, BLACK, WHITE);
+      GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
     }
     // 기울기 센서 변화 감지
     else if (slopeFlag == 1)

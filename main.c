@@ -8,11 +8,13 @@
 #include "core_cm3.h"
 #include "misc.h"
 #include "touch.h"
+#include "lcd.h"
 
 /* function prototype */
 void RCC_Configure(void);
 void Slope_GPIO_Configure(void);
 void Light_GPIO_Configure(void);
+void Input_GPIO_Configure(void);
 void EXTI_Configure(void);
 void ADC_Configure(void);
 void ADC1_2_IRQHandler(void);
@@ -32,7 +34,7 @@ uint16_t brightValue = 0;
 void RCC_Configure(void)
 {
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-  // PC10 - 기울기 센서
+  // PC10 - 기울기 센서, 버튼
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
   // 조도 센서
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
@@ -61,6 +63,16 @@ void Light_GPIO_Configure()
   GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
+// 입력 버튼 - PC13
+void Input_GPIO_Configure()
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD | GPIO_Mode_IPU;
+  GPIO_Init(GPIOC, &GPIO_InitStructure);
+}
+
 void Output_GPIO_Configure()
 {
   GPIO_InitTypeDef GPIO_InitStructure;
@@ -79,6 +91,14 @@ void EXTI_Configure(void)
   EXTI_InitStructure.EXTI_Line = EXTI_Line10;
   EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
   EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+  EXTI_Init(&EXTI_InitStructure);
+
+  // PC13 - 버튼
+  GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource4);
+  EXTI_InitStructure.EXTI_Line = EXTI_Line4;
+  EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
   EXTI_InitStructure.EXTI_LineCmd = ENABLE;
   EXTI_Init(&EXTI_InitStructure);
 }
@@ -158,7 +178,7 @@ void EXTI15_10_IRQHandler(void)
 {
   if (EXTI_GetITStatus(EXTI_Line10) != RESET)
   {
-    if (startSignal && (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_10) != initStatus))
+    if (startSignal && (getSlopeSensorValue() != initStatus))
     {
       slopeFlag = 1;
     }
@@ -190,19 +210,42 @@ void clickStartButton()
 int main(void)
 {
   SystemInit();
+
   RCC_Configure();
+
   Slope_GPIO_Configure();
   Light_GPIO_Configure();
-  ADC_Configure();
-  EXTI_Configure();
-  Slope_NVIC_Configure();
-  Light_NVIC_Configure();
+  Input_GPIO_Configure();
   Output_GPIO_Configure();
 
+  ADC_Configure();
+  EXTI_Configure();
+
+  Slope_NVIC_Configure();
+  Light_NVIC_Configure();
+
+  LCD_Init();
+  Touch_Configuration();
+  Touch_Adjust();
+  LCD_Clear(WHITE);
+
   // 시작버튼이라 가정
-  clickStartButton();
+  // clickStartButton();
   while (1)
   {
+    while (1)
+    {
+      startSignal = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
+      if (startSignal == 1)
+      {
+        clickStartButton();
+        break;
+      }
+    }
+    GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+    Delay();
+    GPIO_ResetBits(GPIOD, GPIO_Pin_3);
+    LCD_ShowString(0, 0, "OUT while", RED, WHITE);
 
     // 조도 센서 밝기 감지
     if (lightFlag == 1)

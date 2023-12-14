@@ -22,6 +22,7 @@ void Slope_NVIC_Configure(void);
 void Light_NVIC_Configure(void);
 void EXTI15_10_IRQHandler(void);
 void Delay(void);
+void StatusInit(void);
 
 //---------------------------------------------------------------------------------------------------
 uint8_t initStatus = 0;
@@ -199,7 +200,7 @@ int getSlopeSensorValue()
   return GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_10);
 }
 
-void clickStartButton()
+void StatusInit(void)
 {
   startSignal = 1;
   initStatus = getSlopeSensorValue();
@@ -229,23 +230,22 @@ int main(void)
   Touch_Adjust();
   LCD_Clear(WHITE);
 
-  // 시작버튼이라 가정
-  // clickStartButton();
   while (1)
   {
-    while (1)
+    while (startSignal != 1)
     {
       startSignal = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
+      LCD_ShowString(0, 0, "WAITING...", BLACK, WHITE);
       if (startSignal == 1)
       {
-        clickStartButton();
+        StatusInit();
+        LCD_Clear(WHITE);
         break;
       }
     }
-    GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
-    Delay();
-    GPIO_ResetBits(GPIOD, GPIO_Pin_3);
-    LCD_ShowString(0, 0, "OUT while", RED, WHITE);
+
+    // START
+    LCD_ShowString(0, 0, "START!!", BLACK, WHITE);
 
     // 조도 센서 밝기 감지
     if (lightFlag == 1)
@@ -253,12 +253,14 @@ int main(void)
       GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
       Delay();
       GPIO_ResetBits(GPIOD, GPIO_Pin_3);
+      LCD_ShowString(0, 0, "EMERGENCY!!", RED, WHITE);
     }
     // 기울기 센서 변화 감지
     else if (slopeFlag == 1)
     {
       // 조도 센서 값 읽기
       ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+      LCD_ShowString(0, 0, "SLOPE ON", RED, WHITE);
     }
     // 평상시
     else

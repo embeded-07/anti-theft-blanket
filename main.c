@@ -61,6 +61,7 @@ void USART_NVIC_Configure(void);
 void Delay(void);
 void StatusInit(void);
 uint8_t getSlopeSensorValue(void);
+void DebugByPhone(str[]);
 
 // 시스템 부팅시 모든 세팅 값 초기화
 void StartSystem(void);
@@ -410,6 +411,14 @@ void StartSystem(void)
   LCD_Clear(WHITE);
 }
 
+void DebugByPhone(str[] msg)
+{
+  for (int i = 0; msg[i] != '\0'; i++)
+  {
+    USART_SendData(USART2, msg[i]);
+  }
+}
+
 /* 센싱 및 시스템 로직 구현 */
 int main(void)
 {
@@ -432,7 +441,7 @@ int main(void)
     while (startFlag != 1)
     {
       startFlag = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
-      LCD_ShowString(0, 0, "...", BLACK, WHITE);
+      DebugByPhone(".");
       // 시작 버튼 입력시 전역 변수 초기화
       if (startFlag == 1)
       {
@@ -449,8 +458,7 @@ int main(void)
     {
       //? 이거 없어도 될 것 같은데
       ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-      LCD_Clear(WHITE);
-      LCD_ShowString(0, 0, "DANGER???", RED, WHITE);
+      DebugByPhone("Slope ON");
     }
     // IRQHandler에서 조도 센서 변화 감지
     // -> 부저 작동 및 블루투스 전송
@@ -460,23 +468,19 @@ int main(void)
       GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
       Delay();
       GPIO_ResetBits(GPIOD, GPIO_Pin_3);
-      LCD_Clear(WHITE);
-      LCD_ShowString(0, 0, "DANGER!!!", RED, WHITE);
 
       // 블루투스 통신을 통해 사용자 휴대폰으로 경고 메시지 전송
-      char str[] = "STOLEN!";
-      for (int i = 0; str[i] != '\0'; i++)
-      {
-        USART_SendData(USART2, str[i]);
-      }
+      DebugByPhone("Light On");
 
       // 도난 감지 후 사용자가 돌아와서 버튼 누를 때까지 대기
       while (startFlag != 0)
       {
+        DebugByPhone("!");
         // 사용자가 다시 버튼 누르면 종료 후 초기화
         startFlag = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
         if (startFlag == 0)
         {
+          DebugByPhone("Reset");
           // 전역 변수 초기화
           GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
           slopeFlag = 0;
@@ -488,7 +492,7 @@ int main(void)
     // 평상시
     else
     {
-      LCD_ShowString(0, 0, "START!!", BLACK, WHITE);
+      DebugByPhone("~");
     }
   }
   return 0;

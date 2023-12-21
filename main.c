@@ -415,6 +415,17 @@ int main(void)
 {
   StartSystem();
 
+  /* 로직 개요 */
+  /*
+    시작 버튼 입력까지 대기
+    -> 시작 버튼 입력시 IRQHandler를 통해 기울기 센서 작동 시작
+    -> 도둑이 담요를 들추는 경우
+    -> 기울기 센서가 움직임 감지시 IRQHandler를 통해 조도 센서 작동 시작
+    -> 조도 센서가 빛 감지시 도난 확정으로 인식
+    -> LED, 부저 작동
+    -> 블루투스를 통해 사용자 휴대폰에 알림 전송
+    -> 사용자가 돌아와서 종료 버튼 입력시 모두 종료
+  */
   while (1)
   {
     // 시작 버튼 입력 전까지 대기
@@ -466,6 +477,7 @@ int main(void)
         startFlag = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
         if (startFlag == 0)
         {
+          // 전역 변수 초기화
           GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
           slopeFlag = 0;
           lightFlag = 0;

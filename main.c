@@ -63,7 +63,7 @@ void StatusInit(void);
 uint8_t getSlopeSensorValue(void);
 void StartSystem(void);
 int putchar(int);
-void USART_SendString(USART_TypeDef, uint8_t);
+void USART_SendString(USART_TypeDef *USARTx, uint8_t *str);
 
 // 시스템 부팅시 모든 세팅 값 초기화
 void StartSystem(void);
@@ -323,9 +323,11 @@ void USART2_IRQHandler(void)
   if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
   {
     word = USART_ReceiveData(USART2);
+    // 사용자가 휴대폰 입력으로 'x' 입력시 시스템 초기화
     if (word == 'x')
     {
       startFlag = 0;
+      word = NULL;
     }
     USART_ClearITPendingBit(USART2, USART_IT_RXNE);
   }
@@ -343,7 +345,6 @@ void ADC1_2_IRQHandler()
     int isLightSensorOn = startFlag && slopeFlag && (brightValue < threshold);
     if (isLightSensorOn && !lightFlag)
     {
-      // printf("Light Detect!!!!!!!!!!!!!!!\n");
       lightFlag = 1; // 조도 센서도 감지 되었으므로 도난 확정 > main()
     }
     ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
@@ -359,7 +360,6 @@ void EXTI15_10_IRQHandler(void)
     int isSlopeSensorOn = startFlag && (getSlopeSensorValue() != initSlopeValue);
     if (isSlopeSensorOn && !slopeFlag)
     {
-      // printf("Slope Detect!\n");
       slopeFlag = 1; // 기울기 센서가 감지 되었으므로 조도 센서 감지 시작 > main()
     }
     EXTI_ClearITPendingBit(EXTI_Line10);
@@ -370,7 +370,7 @@ void EXTI15_10_IRQHandler(void)
 void Delay(void)
 {
   int i;
-  for (i = 0; i < 2000000; i++)
+  for (i = 0; i < 1000000; i++)
   {
   }
 }
@@ -471,17 +471,17 @@ int main(void)
     // -> 부저 작동 및 블루투스 전송
     if (lightFlag == 1)
     {
-      // LED 및 부저 작동
-      GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
-      Delay();
-      GPIO_ResetBits(GPIOD, GPIO_Pin_3);
-
       // 블루투스 통신을 통해 사용자 휴대폰으로 경고 메시지 전송
       USART_SendString(USART2, "Steal Detected !!!!\n");
 
       // 도난 감지 후 사용자가 돌아와서 버튼 누를 때까지 대기
       while (startFlag != 0)
       {
+        // LED 및 부저 작동
+        GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+        Delay();
+        GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+
         // 사용자가 다시 버튼 누르면 종료 후 초기화
         if (startFlag == 0)
         {

@@ -59,14 +59,16 @@ void USART_NVIC_Configure(void);
 
 // 커스텀 구현 함수
 void Delay(void);
-void StatusInit(void);
-uint8_t getSlopeSensorValue(void);
-void StartSystem(void);
-int putchar(int);
+void Status_Init(void);
+uint8_t Get_Slope_Sensor_Value(void);
 void USART_SendString(USART_TypeDef *USARTx, uint8_t *str);
+void Alert_Warning(void);
+int putchar(int);
 
 // 시스템 부팅시 모든 세팅 값 초기화
-void StartSystem(void);
+void Start_System(void);
+
+/* --- */
 
 /* 전역 변수 */
 // IRQHandler를 통해 값 변경 후 main 함수에서 검증으로 사용
@@ -77,6 +79,8 @@ uint8_t lightFlag = 0; // 조도 센서 임계값 초과 여부 저장: 0 || 1
 // IRQHandler에서 실시간으로 입력받고 임계값과 비교하는 각 센서 값
 uint8_t initSlopeValue = 0; // 초기 기울기 값 저장: 0 || 1
 uint16_t brightValue = 0;   // 조도 센서 입력 값 저장
+
+/* --- */
 
 /* 필요 포트 전압 인가 */
 void RCC_Configure(void)
@@ -357,7 +361,7 @@ void EXTI15_10_IRQHandler(void)
   if (EXTI_GetITStatus(EXTI_Line10) != RESET)
   {
     // 시작 버튼 입력 & 임계값 초과인 경우 발동
-    int isSlopeSensorOn = startFlag && (getSlopeSensorValue() != initSlopeValue);
+    int isSlopeSensorOn = startFlag && (Get_Slope_Sensor_Value() != initSlopeValue);
     if (isSlopeSensorOn && !slopeFlag)
     {
       slopeFlag = 1; // 기울기 센서가 감지 되었으므로 조도 센서 감지 시작 > main()
@@ -376,21 +380,21 @@ void Delay(void)
 }
 
 /* 기울기 센서 값 입력 */
-uint8_t getSlopeSensorValue(void)
+uint8_t Get_Slope_Sensor_Value(void)
 {
   return GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_10);
 }
 
 /* 시작 버튼 입력과 동시에 실행되어 전역 변수 초기화 */
-void StatusInit(void)
+void Status_Init(void)
 {
-  initSlopeValue = getSlopeSensorValue();
+  initSlopeValue = Get_Slope_Sensor_Value();
   GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
   return;
 }
 
 /* 시스템 부팅시 모든 세팅 값 초기화 */
-void StartSystem(void)
+void Start_System(void)
 {
   SystemInit();
   RCC_Configure();
@@ -436,10 +440,18 @@ void USART_SendString(USART_TypeDef *USARTx, uint8_t *str)
     ;
 }
 
+/* 도난시 LED, 부저 1초마다 작동 */
+void Alert_Warning(void)
+{
+  GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+  Delay();
+  GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+}
+
 /* 센싱 및 시스템 로직 구현 */
 int main(void)
 {
-  StartSystem();
+  Start_System();
 
   /* 로직 개요 */
   /*
@@ -461,7 +473,7 @@ int main(void)
       // 시작 버튼 입력시 전역 변수 초기화 및 보안 시스템 시작
       if (startFlag == 1)
       {
-        StatusInit();
+        Status_Init();
         USART_SendString(USART2, "Security Running...\n");
         break;
       }
@@ -478,9 +490,7 @@ int main(void)
       while (startFlag != 0)
       {
         // LED 및 부저 작동
-        GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
-        Delay();
-        GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+        Alert_Warning();
 
         // 사용자가 다시 버튼 누르면 종료 후 초기화
         if (startFlag == 0)

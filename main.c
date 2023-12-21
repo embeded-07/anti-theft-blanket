@@ -323,7 +323,10 @@ void USART2_IRQHandler(void)
   if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
   {
     word = USART_ReceiveData(USART2);
-    USART_SendData(USART1, word); // 단순 전송
+    if (word == 'x')
+    {
+      startFlag = 0;
+    }
     USART_ClearITPendingBit(USART2, USART_IT_RXNE);
   }
 }
@@ -480,7 +483,6 @@ int main(void)
       while (startFlag != 0)
       {
         // 사용자가 다시 버튼 누르면 종료 후 초기화
-        startFlag = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
         if (startFlag == 0)
         {
           // 전역 변수 및 초기화

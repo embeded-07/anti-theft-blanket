@@ -82,12 +82,12 @@ void Light_GPIO_Configure()
   GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
-// 입력 버튼 - PC13
+// 시작, 종료 버튼 - PC4, PC5
 void Input_GPIO_Configure()
 {
   GPIO_InitTypeDef GPIO_InitStructure;
 
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD | GPIO_Mode_IPU;
   GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
@@ -143,9 +143,17 @@ void EXTI_Configure(void)
   EXTI_InitStructure.EXTI_LineCmd = ENABLE;
   EXTI_Init(&EXTI_InitStructure);
 
-  // PC13 - 버튼
+  // PC4 - 시작 버튼
   GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource4);
   EXTI_InitStructure.EXTI_Line = EXTI_Line4;
+  EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+  EXTI_Init(&EXTI_InitStructure);
+
+  // PC5 - 종료 버튼
+  GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource5);
+  EXTI_InitStructure.EXTI_Line = EXTI_Line5;
   EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
   EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
   EXTI_InitStructure.EXTI_LineCmd = ENABLE;
@@ -270,12 +278,10 @@ void USART1_IRQHandler(void)
   uint16_t word;
   if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
   {
-    // the most recent received data by the USART1 peripheral
     word = USART_ReceiveData(USART1);
 
     USART_SendData(USART2, word);
 
-    // clear 'Read data register not empty' flag
     USART_ClearITPendingBit(USART1, USART_IT_RXNE);
   }
 }
@@ -285,12 +291,10 @@ void USART2_IRQHandler(void)
   uint16_t word;
   if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
   {
-    // the most recent received data by the USART2 peripheral
     word = USART_ReceiveData(USART2);
 
     USART_SendData(USART1, word);
 
-    // clear 'Read data register not empty' flag
     USART_ClearITPendingBit(USART2, USART_IT_RXNE);
   }
 }
@@ -395,8 +399,25 @@ int main(void)
       LCD_Clear(WHITE);
       LCD_ShowString(0, 0, "DANGER!!!", RED, WHITE);
 
-      // Bluetooth
-      USART_SendData(USART2, 'Y');
+      // 휴대폰으로 경고 메시지 전송
+      char str[] = "STOLEN!";
+      for (int i = 0; str[i] != '\0'; i++)
+      {
+        USART_SendData(USART2, str[i]);
+      }
+
+      // 종료 버튼 누를때까지 무한 반복
+      while (startSignal != 0)
+      {
+        startSignal = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
+        if (startSignal == 0)
+        {
+          GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+          slopeFlag = 0;
+          lightFlag = 0;
+          break;
+        }
+      }
     }
     // 기울기 센서 변화 감지
     else if (slopeFlag == 1)

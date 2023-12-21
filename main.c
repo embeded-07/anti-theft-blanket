@@ -327,6 +327,7 @@ void USART2_IRQHandler(void)
   if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
   {
     word = USART_ReceiveData(USART2);
+    USART_SendData(USART1, word);
     // 사용자가 휴대폰 입력으로 'x' 입력시 시스템 초기화
     if (word == 'x')
     {
@@ -374,7 +375,7 @@ void EXTI15_10_IRQHandler(void)
 void Delay(void)
 {
   int i;
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < 3000000; i++)
   {
   }
 }
@@ -448,6 +449,7 @@ void Alert_Warning(void)
   GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
   Delay();
   GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
+  Delay();
 }
 
 /* 센싱 및 시스템 로직 구현 */

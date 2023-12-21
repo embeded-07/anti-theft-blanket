@@ -389,6 +389,8 @@ uint8_t Get_Slope_Sensor_Value(void)
 void Status_Init(void)
 {
   initSlopeValue = Get_Slope_Sensor_Value();
+  slopeFlag = 0;
+  lightFlag = 0;
   GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
   return;
 }
@@ -496,9 +498,7 @@ int main(void)
         if (startFlag == 0)
         {
           // 전역 변수 및 초기화
-          GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
-          slopeFlag = 0;
-          lightFlag = 0;
+          Status_Init();
           USART_SendString(USART2, "System Reset\n");
           break;
         }

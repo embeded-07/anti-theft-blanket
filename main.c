@@ -341,7 +341,7 @@ void USART2_IRQHandler(void)
 /* 조도 센서 값 핸들링 */
 void ADC1_2_IRQHandler()
 {
-  uint16_t threshold = 3950; // 담요 속과 밖의 밝기 차이를 테스트를 통해 설정한 임계값
+  uint16_t threshold = 4250; // 담요 속과 밖의 밝기 차이를 테스트를 통해 설정한 임계값
 
   if (ADC_GetITStatus(ADC1, ADC_IT_EOC) != RESET)
   {

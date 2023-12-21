@@ -334,7 +334,7 @@ void ADC1_2_IRQHandler()
   {
     brightValue = ADC_GetConversionValue(ADC1);
     // 시작 버튼 입력 & 기울기 센서 감지 & 임계값 초과인 경우 발동
-    bool isLightSensorOn = startFlag && slopeFlag && (brightValue < threshold);
+    int isLightSensorOn = startFlag && slopeFlag && (brightValue < threshold);
     if (isLightSensorOn)
     {
       lightFlag = 1; // 조도 센서도 감지 되었으므로 도난 확정 > main()
@@ -349,7 +349,7 @@ void EXTI15_10_IRQHandler(void)
   if (EXTI_GetITStatus(EXTI_Line10) != RESET)
   {
     // 시작 버튼 입력 & 임계값 초과인 경우 발동
-    bool isSlopeSensorOn = startFlag && (getSlopeSensorValue() != initSlopeValue);
+    int isSlopeSensorOn = startFlag && (getSlopeSensorValue() != initSlopeValue);
     if (isSlopeSensorOn)
     {
       slopeFlag = 1; // 기울기 센서가 감지 되었으므로 조도 센서 감지 시작 > main()
@@ -488,7 +488,6 @@ int main(void)
     // 평상시
     else
     {
-      LCD_Clear(WHITE);
       LCD_ShowString(0, 0, "START!!", BLACK, WHITE);
     }
   }

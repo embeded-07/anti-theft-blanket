@@ -249,20 +249,18 @@ void USART_NVIC_Configure(void)
   NVIC_PriorityGroupConfig(NVIC_PriorityGroup_0);
 
   // USART1
-  // 'NVIC_EnableIRQ' is only required for USART setting
   NVIC_EnableIRQ(USART1_IRQn);
   NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; // TODO
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;        // TODO
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 
   // USART2
-  // 'NVIC_EnableIRQ' is only required for USART setting
   NVIC_EnableIRQ(USART2_IRQn);
   NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; // TODO
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;        // TODO
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 }
@@ -290,7 +288,7 @@ void USART2_IRQHandler(void)
     // the most recent received data by the USART2 peripheral
     word = USART_ReceiveData(USART2);
 
-     USART_SendData(USART1, word);
+    USART_SendData(USART1, word);
 
     // clear 'Read data register not empty' flag
     USART_ClearITPendingBit(USART2, USART_IT_RXNE);
@@ -398,17 +396,6 @@ int main(void)
       LCD_ShowString(0, 0, "DANGER!!!", RED, WHITE);
 
       // Bluetooth
-      // int i = 0;
-      // char str[] = "WARNING!\r\n";
-      // while (str[i] != 0)
-      // {
-      //   LCD_Clear(WHITE);
-      //   LCD_ShowString(100, 100, str[i], RED, WHITE);
-      //   while ((USART1->SR & USART_SR_TC) == 0)
-      //     ;
-      //   USART_SendData(USART2, str[i]);
-      //   i++;
-      // }
       USART_SendData(USART2, 'Y');
     }
     // 기울기 센서 변화 감지

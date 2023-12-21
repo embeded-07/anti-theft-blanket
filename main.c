@@ -8,6 +8,7 @@
 #include "core_cm3.h"
 #include "misc.h"
 #include "touch.h"
+#include "stdio.h"
 
 /* 사용 센서 및 장비 */
 /*
@@ -60,7 +61,9 @@ void USART_NVIC_Configure(void);
 void Delay(void);
 void StatusInit(void);
 uint8_t getSlopeSensorValue(void);
-void DebugByPhone(str[]);
+void StartSystem(void);
+int putchar(int);
+void USART_SendString(USART_TypeDef, uint8_t);
 
 // 시스템 부팅시 모든 세팅 값 초기화
 void StartSystem(void);
@@ -120,7 +123,7 @@ void Input_GPIO_Configure()
   GPIO_InitTypeDef GPIO_InitStructure;
 
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD | GPIO_Mode_IPU;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
   GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
@@ -335,8 +338,9 @@ void ADC1_2_IRQHandler()
     brightValue = ADC_GetConversionValue(ADC1);
     // 시작 버튼 입력 & 기울기 센서 감지 & 임계값 초과인 경우 발동
     int isLightSensorOn = startFlag && slopeFlag && (brightValue < threshold);
-    if (isLightSensorOn)
+    if (isLightSensorOn && !lightFlag)
     {
+      // printf("Light Detect!!!!!!!!!!!!!!!\n");
       lightFlag = 1; // 조도 센서도 감지 되었으므로 도난 확정 > main()
     }
     ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
@@ -350,8 +354,9 @@ void EXTI15_10_IRQHandler(void)
   {
     // 시작 버튼 입력 & 임계값 초과인 경우 발동
     int isSlopeSensorOn = startFlag && (getSlopeSensorValue() != initSlopeValue);
-    if (isSlopeSensorOn)
+    if (isSlopeSensorOn && !slopeFlag)
     {
+      // printf("Slope Detect!\n");
       slopeFlag = 1; // 기울기 센서가 감지 되었으므로 조도 센서 감지 시작 > main()
     }
     EXTI_ClearITPendingBit(EXTI_Line10);
@@ -376,7 +381,6 @@ uint8_t getSlopeSensorValue(void)
 /* 시작 버튼 입력과 동시에 실행되어 전역 변수 초기화 */
 void StatusInit(void)
 {
-  startFlag = 1;
   initSlopeValue = getSlopeSensorValue();
   GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
   return;
@@ -405,12 +409,28 @@ void StartSystem(void)
   USART_NVIC_Configure();
 }
 
-void DebugByPhone(str[] msg)
+/* 프린트 디버깅용 함수 */
+int putchar(int ch)
 {
-  for (int i = 0; msg[i] != '\0'; i++)
+  while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET)
+    ;
+  USART_SendData(USART1, ch);
+  return ch;
+}
+
+/* 블루투스 통신을 통해 휴대폰으로 String을 전송 */
+void USART_SendString(USART_TypeDef *USARTx, uint8_t *str)
+{
+  while (*str)
   {
-    USART_SendData(USART2, msg[i]);
+    // 송신 데이터 레지스터가 비어있을 때까지 기다림
+    while (USART_GetFlagStatus(USARTx, USART_FLAG_TXE) == RESET)
+      ;
+    USART_SendData(USARTx, *str++);
   }
+  // 전송 완료까지 기다림
+  while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) == RESET)
+    ;
 }
 
 /* 센싱 및 시스템 로직 구현 */
@@ -434,28 +454,19 @@ int main(void)
     // 시작 버튼 입력 전까지 대기
     while (startFlag != 1)
     {
-      startFlag = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
-      DebugByPhone(".");
-      // 시작 버튼 입력시 전역 변수 초기화
+      startFlag = !GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
+      // 시작 버튼 입력시 전역 변수 초기화 및 보안 시스템 시작
       if (startFlag == 1)
       {
         StatusInit();
+        USART_SendString(USART2, "Security Running...\n");
         break;
       }
     }
 
-    /* 센싱 및 시스템 로직 */
-    // IRQHandler에서 기울기 센서 움직임 감지
-    // -> IRQHandler에서 전역 변수 변경으로 조도 센서 센싱 시작
-    if (slopeFlag == 1)
-    {
-      //? 이거 없어도 될 것 같은데
-      ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-      DebugByPhone("Slope ON");
-    }
     // IRQHandler에서 조도 센서 변화 감지
     // -> 부저 작동 및 블루투스 전송
-    else if (lightFlag == 1)
+    if (lightFlag == 1)
     {
       // LED 및 부저 작동
       GPIO_SetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
@@ -463,29 +474,31 @@ int main(void)
       GPIO_ResetBits(GPIOD, GPIO_Pin_3);
 
       // 블루투스 통신을 통해 사용자 휴대폰으로 경고 메시지 전송
-      DebugByPhone("Light On");
+      USART_SendString(USART2, "Steal Detected !!!!\n");
 
       // 도난 감지 후 사용자가 돌아와서 버튼 누를 때까지 대기
       while (startFlag != 0)
       {
-        DebugByPhone("!");
         // 사용자가 다시 버튼 누르면 종료 후 초기화
         startFlag = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4);
         if (startFlag == 0)
         {
-          DebugByPhone("Reset");
-          // 전역 변수 초기화
+          // 전역 변수 및 초기화
           GPIO_ResetBits(GPIOD, GPIO_Pin_2 | GPIO_Pin_3);
           slopeFlag = 0;
           lightFlag = 0;
+          USART_SendString(USART2, "System Reset\n");
           break;
         }
       }
     }
-    // 평상시
-    else
+    /* 센싱 및 시스템 로직 */
+    // IRQHandler에서 기울기 센서 움직임 감지
+    // -> IRQHandler에서 전역 변수 변경으로 조도 센서 센싱 시작
+    else if (slopeFlag == 1)
     {
-      DebugByPhone("~");
+      //? 이거 없어도 될 것 같은데
+      ADC_SoftwareStartConvCmd(ADC1, ENABLE);
     }
   }
   return 0;

@@ -8,7 +8,6 @@
 #include "core_cm3.h"
 #include "misc.h"
 #include "touch.h"
-#include "lcd.h"
 
 /* 사용 센서 및 장비 */
 /*
@@ -404,11 +403,6 @@ void StartSystem(void)
   Slope_NVIC_Configure();
   Light_NVIC_Configure();
   USART_NVIC_Configure();
-
-  LCD_Init();
-  Touch_Configuration();
-  Touch_Adjust();
-  LCD_Clear(WHITE);
 }
 
 void DebugByPhone(str[] msg)
@@ -446,7 +440,6 @@ int main(void)
       if (startFlag == 1)
       {
         StatusInit();
-        LCD_Clear(WHITE);
         break;
       }
     }
